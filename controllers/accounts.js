@@ -1,18 +1,40 @@
 const express = require('express');
 const router  = express.Router();
 
-const usersPassArr = [
+const bcryptjs = require("bcryptjs");
+const jsonwebtoken = require("jsonwebtoken");
+
+const usersPassArr = []
+
+router.post('/createUser', async (req, res)=>{
+    console.log(usersPassArr);
+    const newUser = req.body
+    // if new user's mail is already used:
+    if (newUser.user != "" && newUser.pass != "" && newUser.email != "")
     {
-        user: 'Bill Gates',
-        pass: '123456',
-        email: 'billgates@micro.com'
-    },
-    {
-        user: 'Main User',
-        pass: '111',
-        email: 'digiMail@fastMail.com'
+        if ('undefined' != typeof(usersPassArr.find(user => newUser.email == user.email)))
+        {
+            return res.status(200).json({
+                message: 'Error: given email is already used'
+            });
+        }
+        else
+        {
+            newUser.pass = await bcryptjs.hash(newUser.pass, 10);
+            usersPassArr.push(newUser);
+            console.log(usersPassArr);
+            return res.status(200).json(usersPassArr);
+        }
     }
-]
+    else
+    {
+        return res.status(200).json({
+            message: "Error: user name, password and email must be filled."
+        })
+    }
+})
+
+
 router.get('/sayHello', (req, res)=>{
     return res.status(200).json({
         message: 'Say hello from API route'
@@ -20,19 +42,27 @@ router.get('/sayHello', (req, res)=>{
 })
 
 router.post('/sayHello', (req,res) => {
-    const fname  = req.body.full_name;
+    const {token}  = req.body
 
+    const data = jsonwebtoken.verify(token, "!");
     return res.status(200).json({
-        message: `Hello ${fname} from API route`
+        message: data
     });
 })
 
-router.post('/login', (req,res) => {
+router.post('/login', async(req,res) => {
     const {email, pass} = req.body;
 
     let isUserFound = false;
     let userName = "";
     let userPass = "";
+
+    if (email == "" || pass == "")
+    {
+        return res.status(200).json({
+            message: "Error: email and password must be filled"
+        });
+    }
 
     for (let currUser of usersPassArr)
     {
@@ -52,10 +82,12 @@ router.post('/login', (req,res) => {
     }
     else
     {
-        if (pass == userPass)
+        if (await bcryptjs.compare(pass, userPass))
         {
+            const newToken = await jsonwebtoken.sign(req.body, "!");
             return res.status(200).json({
-                message: `Hello ${userName}.`
+                message: `Hello ${userName}.`,
+                token: newToken
             });
         }
         else
@@ -66,6 +98,33 @@ router.post('/login', (req,res) => {
         }
     }
 })
+
+// 15.03.22 - bcryptjs jsonwebtoken
+/*
+router.post('/login', async (req,res) => {
+    const {email, pass} = req.body;
+
+    let isUserFound = false;
+    let userName = "";
+    let userPass = "";
+
+    const hash_password = await bcryptjs.hash(pass, 10);
+    const isPassMatch = await bcryptjs.compare(pass, hash_password);
+
+    const data = {
+        id: 123533,
+        firstName: "New",
+        lastName: "User",
+        email: "a@outlook.co.il",
+        position: "Worker"
+    };
+
+    const token = await jsonwebtoken.sign(data, "!");
+    return res.status(200).json({
+    message: `${hash_password} ${isPassMatch}`,
+    token: `${token}`
+    });
+});*/
 
 module.exports = router;
 
